@@ -58,26 +58,10 @@ The project uses multiple healthcare data sources:
 
 - CPT codes from flat files
 
-## Architecture
+## Architecture Diagram (Solution Architecture)
 
-```text
-Source Systems
-     |
-     |-- Azure SQL DB
-     |-- Flat Files
-     |-- APIs
-     |
-     v
-Landing Layer
-     |
-     v
-Bronze Layer - Raw Parquet Files
-     |
-     v
-Silver Layer - Cleaned Delta Tables
-     |
-     v
-Gold Layer - Fact and Dimension Tables
-     |
-     v
-Business Reporting / Analytics
+The pipeline follows the Medallion Architecture pattern with three data layers: Bronze, Silver, and Gold.
+
+<p align="center">
+  <img src="docs/architecture.png" alt="Azure Healthcare RCM Data Pipeline Architecture" width="100%">
+</p>
