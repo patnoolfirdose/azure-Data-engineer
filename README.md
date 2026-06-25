@@ -1,5 +1,3 @@
-# azure-Data-engineer
-
 # Azure Data Engineering Project – Healthcare Revenue Cycle Management
 
 ## Project Overview
