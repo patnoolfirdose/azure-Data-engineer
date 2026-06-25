@@ -66,103 +66,198 @@ The pipeline follows the Medallion Architecture pattern with three data layers: 
   <img src="docs/architecture.png" alt="Azure Healthcare RCM Data Pipeline Architecture" width="100%">
 </p>
 
-## 🏗️ Medallion Architecture
+# 🏗️ Medallion Architecture
 
-The project follows the **Medallion Architecture** to ensure scalable, reliable, and high-quality data processing.
-
-### 📥 Landing Layer
-
-- Receives raw data from multiple external source systems.
-- Stores incoming files without modification.
-- Acts as the initial staging area before ingestion into the data lake.
+This project is built using the **Medallion Architecture (Landing → Bronze → Silver → Gold)**, a modern data lake design pattern that enables scalable, reliable, and high-quality data processing. The architecture separates data into progressive refinement layers, ensuring raw data preservation, standardized transformations, and analytics-ready datasets while supporting governance, auditing, and incremental processing.
 
 ---
 
-### 🥉 Bronze Layer (Raw Data)
+## 📥 Landing Layer – Raw Data Ingestion
 
-The Bronze layer stores data in its original format and serves as the **single source of truth**.
+The Landing layer acts as the entry point for all incoming data from heterogeneous source systems.
 
-**Features**
+### Responsibilities
 
-- Raw data stored in **Parquet** format
-- Immutable data storage
-- Supports historical tracking
-- Source-level data preservation
+- Receive raw data from multiple source systems.
+- Preserve original file formats before processing.
+- Support batch ingestion from external providers.
+- Maintain source system integrity.
+- Trigger downstream ingestion pipelines.
 
----
+### Source Systems
 
-### 🥈 Silver Layer (Cleaned & Standardized)
-
-The Silver layer transforms raw data into standardized, analytics-ready datasets using Delta Lake.
-
-#### Key Implementations
-
-- ✅ Common Data Model (CDM)
-- ✅ Data Cleaning & Standardization
-- ✅ Data Quality Validation
-- ✅ Bad Record Quarantine
-- ✅ Slowly Changing Dimension (SCD Type 2)
-- ✅ Active/Inactive Record Handling
-- ✅ Delta Table Implementation
+| Source | Type | Frequency |
+|---------|------|-----------|
+| Azure SQL Database | EMR Data | Daily |
+| Insurance Claims | CSV Files | Monthly |
+| NPI Registry | REST API | Daily |
+| ICD Codes | REST API | Daily |
+| CPT Codes | Reference Files | Monthly |
 
 ---
 
-### 🥇 Gold Layer (Business Ready)
+## 🥉 Bronze Layer – Raw Data Repository
 
-The Gold layer contains curated business datasets optimized for reporting and analytics.
+The Bronze layer serves as the **immutable source of truth** for the data platform.
 
-It includes:
+All ingested data is stored in **Parquet format** within Azure Data Lake Storage Gen2 without applying business transformations.
+
+### Responsibilities
+
+- Raw data preservation
+- Schema evolution support
+- Historical data retention
+- Source system traceability
+- Incremental ingestion
+- Auditability
+
+### Technologies
+
+- Azure Data Lake Storage Gen2
+- Azure Data Factory
+- Parquet
+- Azure SQL Database
+
+---
+
+## 🥈 Silver Layer – Data Standardization & Quality
+
+The Silver layer transforms raw datasets into standardized, trusted, analytics-ready datasets using Delta Lake.
+
+This layer contains the majority of business transformation logic and data quality enforcement.
+
+### Major Transformations
+
+### ✔ Data Cleaning
+
+- Remove duplicate records
+- Handle missing values
+- Standardize data formats
+- Normalize column names
+- Remove invalid records
+
+---
+
+### ✔ Common Data Model (CDM)
+
+Data from multiple hospitals and insurance providers is transformed into a unified enterprise schema, enabling cross-source reporting and analytics.
+
+---
+
+### ✔ Data Quality Framework
+
+Multiple validation rules are implemented before data is promoted to the Silver layer.
+
+Examples include:
+
+- Null value validation
+- Duplicate detection
+- Schema validation
+- Data type validation
+- Referential integrity checks
+
+Invalid records are redirected to a **Quarantine Zone** for further investigation without impacting downstream processing.
+
+---
+
+### ✔ Slowly Changing Dimension (SCD Type 2)
+
+Historical changes are preserved for dimensional entities.
+
+Implemented attributes include:
+
+- Inserted Date
+- Modified Date
+- Current Flag
+- Effective Start Date
+- Effective End Date
+
+This allows historical reporting and point-in-time analysis.
+
+---
+
+### ✔ Delta Lake Implementation
+
+Silver tables leverage Delta Lake capabilities such as:
+
+- ACID Transactions
+- Time Travel
+- Schema Enforcement
+- Schema Evolution
+- Optimized Reads
+- Data Versioning
+
+---
+
+## 🥇 Gold Layer – Business Ready Data
+
+The Gold layer contains curated business datasets optimized for reporting, dashboards, KPI calculations, and executive analytics.
+
+### Deliverables
 
 - Fact Tables
 - Dimension Tables
-- Aggregated Business Metrics
-- KPI Reporting Tables
+- Aggregated Metrics
+- Reporting Views
+- Executive KPIs
 
-These datasets are consumed by:
+Examples include:
 
-- Power BI
-- Business Users
-- Data Analysts
-- Data Scientists
-
----
-
-# 🚀 Key Features
-
-- Metadata-driven ingestion pipeline
-- Full Load & Incremental Load support
-- Watermark-based Incremental Processing
-- Audit Logging using Delta Tables
-- Automatic Archive of Existing Files
-- Parallel Azure Data Factory Pipelines
-- Azure Key Vault Integration
-- SCD Type 2 Implementation
-- Data Quality Validation Framework
-- Bad Record Quarantine Process
-- Gold Layer Fact & Dimension Modeling
-- Unity Catalog Integration
-- Secure & Scalable Azure Architecture
+- Revenue Analytics
+- Accounts Receivable KPIs
+- Claim Processing Metrics
+- Provider Performance
+- Department Performance
+- Patient Financial Analytics
 
 ---
 
-# ⚙️ Azure Data Factory Pipeline
+# ⚡ Metadata Driven Azure Data Factory Pipeline
 
-The Azure Data Factory (ADF) pipeline is **metadata-driven**, allowing dynamic ingestion of multiple tables without creating separate pipelines.
+Rather than creating individual pipelines for every table, this solution implements a **metadata-driven ingestion framework**.
 
-### Pipeline Workflow
+The pipeline dynamically reads configuration metadata and processes tables based on runtime configuration.
 
-1. Read metadata configuration file.
-2. Lookup active tables.
-3. Iterate through each table using **ForEach**.
-4. Determine whether the table requires **Full Load** or **Incremental Load**.
-5. Copy data from Azure SQL Database to Azure Data Lake Storage Gen2.
-6. Archive previous files before loading new data.
-7. Log pipeline execution details into the Audit table.
-8. Trigger downstream Databricks processing.
+## Pipeline Workflow
+
+```text
+Read Metadata Configuration
+            │
+            ▼
+Lookup Active Tables
+            │
+            ▼
+ForEach Activity
+            │
+            ▼
+Determine Load Type
+            │
+      ┌──────────────┐
+      │              │
+      ▼              ▼
+ Full Load     Incremental Load
+      │              │
+      └──────┬───────┘
+             ▼
+Copy Data to Bronze
+             │
+             ▼
+Archive Previous Files
+             │
+             ▼
+Audit Logging
+             │
+             ▼
+Databricks Processing
+```
 
 ---
 
-## 📄 Metadata Configuration Example
+# ⚙️ Metadata Configuration
+
+Each table is controlled using a centralized configuration file.
+
+This allows onboarding new tables without modifying the pipeline.
 
 ```csv
 database,datasource,tablename,loadtype,watermark,is_active,targetpath
@@ -172,33 +267,90 @@ trendytech-hospital-a,hos-a,dbo.patients,Incremental,ModifiedDate,1,hosa
 trendytech-hospital-a,hos-a,dbo.transactions,Incremental,ModifiedDate,1,hosa
 trendytech-hospital-a,hos-a,dbo.providers,Full,,1,hosa
 trendytech-hospital-a,hos-a,dbo.departments,Full,,1,hosa
-trendytech-hospital-b,hos-b,dbo.encounters,Incremental,ModifiedDate,1,hosb
-trendytech-hospital-b,hos-b,dbo.patients,Incremental,Updated_Date,1,hosb
-trendytech-hospital-b,hos-b,dbo.transactions,Incremental,ModifiedDate,1,hosb
-trendytech-hospital-b,hos-b,dbo.providers,Full,,1,hosb
-trendytech-hospital-b,hos-b,dbo.departments,Full,,1,hosb
 ```
 
-### Metadata Column Description
+### Configuration Fields
 
-| Column | Description |
-|---------|-------------|
-| **database** | Source Azure SQL Database |
-| **datasource** | Hospital identifier |
-| **tablename** | Source table name |
-| **loadtype** | Full or Incremental load |
-| **watermark** | Incremental tracking column |
-| **is_active** | Enable or disable table ingestion |
-| **targetpath** | Destination folder in ADLS Gen2 |
+| Column | Purpose |
+|----------|--------------------------------------|
+| database | Source database |
+| datasource | Hospital identifier |
+| tablename | Source table |
+| loadtype | Full / Incremental |
+| watermark | Incremental tracking column |
+| is_active | Enable or disable ingestion |
+| targetpath | ADLS destination |
 
 ---
 
-## 📊 Pipeline Benefits
+# 🚀 Enterprise Features
 
-- Single metadata-driven pipeline
-- Easily onboard new source tables
-- Supports Full and Incremental loads
-- Reduces pipeline maintenance
-- Highly scalable architecture
-- Enterprise-grade audit logging
-- Dynamic configuration without code changes
+✔ Metadata-Driven Architecture
+
+✔ Dynamic Pipeline Execution
+
+✔ Full & Incremental Loading
+
+✔ Watermark-Based Processing
+
+✔ Delta Lake Implementation
+
+✔ Slowly Changing Dimension (SCD Type 2)
+
+✔ Data Quality Framework
+
+✔ Bad Record Quarantine
+
+✔ Audit Logging
+
+✔ Parallel Pipeline Execution
+
+✔ Azure Key Vault Integration
+
+✔ Unity Catalog Integration
+
+✔ Secure Credential Management
+
+✔ Scalable Data Lake Architecture
+
+✔ Enterprise Folder Structure
+
+✔ Reusable Databricks Notebooks
+
+✔ Configurable ETL Framework
+
+✔ High Performance Parquet Storage
+
+✔ Business Ready Fact & Dimension Modeling
+
+---
+
+# 💼 Business Value
+
+This platform enables healthcare organizations to:
+
+- Improve Revenue Cycle Management reporting
+- Reduce manual ETL effort through automation
+- Accelerate dashboard delivery
+- Maintain complete historical tracking
+- Improve data quality and governance
+- Enable trusted analytics across multiple hospitals
+- Deliver scalable enterprise reporting for finance, operations, and executive stakeholders
+
+---
+
+# 🎯 Technical Skills Demonstrated
+
+**Azure:** Azure Data Factory, Azure Data Lake Storage Gen2, Azure SQL Database, Azure Key Vault
+
+**Processing:** Azure Databricks, PySpark, Delta Lake
+
+**Data Engineering:** ETL, ELT, Medallion Architecture, Metadata-Driven Pipelines, Incremental Loading, Watermarking, SCD Type 2, Data Quality Framework
+
+**Data Modeling:** Star Schema, Fact Tables, Dimension Tables, Common Data Model
+
+**Governance:** Unity Catalog, Audit Logging, Secure Secrets Management
+
+**Languages:** SQL, Python (PySpark)
+
+**Storage Formats:** Parquet, Delta Lake
